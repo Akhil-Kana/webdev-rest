@@ -59,8 +59,31 @@ function dbRun(query, params) {
 // GET request handler for crime codes
 app.get('/codes', (req, res) => {
     console.log(req.query); // query object (key-value pairs after the ? in the url)
-    
-    res.status(200).type('json').send({}); // <-- you will need to change this
+    //res.status(200).type('json').send({}); // <-- you will need to change this
+    let baseQuery = "SELECT code, incident_type FROM Codes";
+    let params = [];
+
+    if(req.query.code) {
+        let codes = req.query.code.split(',').map(Number);
+        let placeholders = codes.map(() => '?').join(',');
+        baseQuery = baseQuery +  'WHERE code IN (${placeholders})';
+        params.push(...codes);
+    }
+
+    baseQuery = baseQuery + " ORDER BY code ASC";
+
+    dbSelect(baseQuery, params)
+    .then(rows => {
+        let result = rows.map(r => ({
+            code: r.code,
+            type: r.incidentType
+        }));
+        res.status(200).json(result);
+    })
+    .catch(err => {
+        console.error(err);
+        res.status(500).type('txt').send("database error");
+    })
 });
 
 // GET request handler for neighborhoods
@@ -87,8 +110,34 @@ app.put('/new-incident', (req, res) => {
 // DELETE request handler for new crime incident
 app.delete('/remove-incident', (req, res) => {
     console.log(req.body); // uploaded data
+    //res.status(200).type('txt').send('OK'); // <-- you may need to change this
+
+    let caseNumber = req.body.case_number;
+
+    if (!caseNumber) {
+        return res.status(400).type('txt').send("error: no case number")
+    }
+
+    let checkQuery = "SELECT case_number FROM Incidents WHERE case_number = ?";
+    dbSelect(checkQuery, [caseNumber])
+        .then(rows => {
+            if (rows.length === 0) {
+                return res.status(500).type('txt').send("error: case number does not exist");
+            }
+
+            let deleteQuery = "DELETE FROM Incidents WHERE case_number = ?";
+            return dbRun(deleteQuery, [caseNumber])
+                .then(() => {
+                    res.status(200).type('txt').send("success");
+                });
+        })
+
+        .catch(err => {
+            console.error(err);
+            res.status(500).type('txt').send("error")
+        });
     
-    res.status(200).type('txt').send('OK'); // <-- you may need to change this
+
 });
 
 /********************************************************************
