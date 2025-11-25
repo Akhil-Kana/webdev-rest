@@ -56,6 +56,17 @@ function dbRun(query, params) {
 /********************************************************************
  ***   REST REQUEST HANDLERS                                      *** 
  ********************************************************************/
+
+//Helper function that allows for date filtering
+function isValidDateString(s) {
+    // Must be YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+
+    const d = new Date(s);
+    return !isNaN(d.getTime());
+}
+
+
 // GET request handler for crime codes
 app.get('/codes', (req, res) => {
     console.log(req.query); // query object (key-value pairs after the ? in the url)
