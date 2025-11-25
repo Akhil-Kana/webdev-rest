@@ -66,7 +66,7 @@ app.get('/codes', (req, res) => {
     if(req.query.code) {
         let codes = req.query.code.split(',').map(Number);
         let placeholders = codes.map(() => '?').join(',');
-        baseQuery = baseQuery +  'WHERE code IN (${placeholders})';
+        baseQuery = baseQuery + ` WHERE code IN (${placeholders})`;
         params.push(...codes);
     }
 
@@ -76,7 +76,7 @@ app.get('/codes', (req, res) => {
     .then(rows => {
         let result = rows.map(r => ({
             code: r.code,
-            type: r.incidentType
+            type: r.incident_type
         }));
         res.status(200).json(result);
     })
