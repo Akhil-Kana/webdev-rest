@@ -94,10 +94,63 @@ app.get('/neighborhoods', (req, res) => {
 });
 
 // GET request handler for crime incidents
-app.get('/incidents', (req, res) => {
-    console.log(req.query); // query object (key-value pairs after the ? in the url)
-    
-    res.status(200).type('json').send({}); // <-- you will need to change this
+app.get('/incidents', async (req,res) => {
+    try {
+        let { start_date, end_date, code, grid, neighborhood, limit } = req.query;
+        limit = limit ? Number(limit) : 1000;
+        if (Number.isNaN(limit) || limit<=0) limit = 1000;
+
+        // build where clauses
+        let clauses = [];
+        let params = [];
+
+        if (start_date) {
+            if (!isValidDateString(start_date)) return res.status(400).send("invalid start_date");
+            clauses.push("date(date_time) >= date(?)");
+            params.push(start_date);
+        }
+        if (end_date) {
+            if (!isValidDateString(end_date)) return res.status(400).send("invalid end_date");
+            clauses.push("date(date_time) <= date(?)");
+            params.push(end_date);
+        }
+        if (code) {
+            const codes = code.split(',').map(s=>Number(s.trim())).filter(n=>!Number.isNaN(n));
+            if (codes.length>0) {
+                let p = codes.map(()=>'?').join(',');
+                clauses.push('code IN ('+p+')');
+                params.push(...codes);
+            }
+        }
+        if (grid) {
+            const grids = grid.split(',').map(s=>Number(s.trim())).filter(n=>!Number.isNaN(n));
+            if (grids.length>0) {
+                let p = grids.map(()=>'?').join(',');
+                clauses.push('police_grid IN ('+p+')');
+                params.push(...grids);
+            }
+        }
+        if (neighborhood) {
+            const nbs = neighborhood.split(',').map(s=>Number(s.trim())).filter(n=>!Number.isNaN(n));
+            if (nbs.length>0) {
+                let p = nbs.map(()=>'?').join(',');
+                clauses.push('neighborhood_number IN ('+p+')');
+                params.push(...nbs);
+            }
+        }
+
+        let query = 'SELECT case_number, date(date_time) as date, time(date_time) as time, code, incident, police_grid, neighborhood_number, block FROM Incidents';
+        if (clauses.length>0) query += ' WHERE ' + clauses.join(' AND ');
+        query += ' ORDER BY date_time DESC';
+        query += ' LIMIT ?';
+        params.push(limit);
+
+        const rows = await dbSelect(query, params);
+        res.json(rows);
+    } catch(err) {
+        console.error(err);
+        res.status(500).type('txt').send("error");
+    }
 });
 
 // PUT request handler for new crime incident
