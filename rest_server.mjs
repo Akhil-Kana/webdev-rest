@@ -99,9 +99,55 @@ app.get('/codes', (req, res) => {
 
 // GET request handler for neighborhoods
 app.get('/neighborhoods', (req, res) => {
-    console.log(req.query); // query object (key-value pairs after the ? in the url)
-    
-    res.status(200).type('json').send({}); // <-- you will need to change this
+
+  let sql = "SELECT neighborhood_number AS id, neighborhood_name AS name FROM Neighborhoods";
+
+  let params = [];
+
+ 
+
+  if (req.query.id) {
+
+    const ids = req.query.id.split(',').map(Number).filter(n => !isNaN(n));
+
+    if (ids.length > 0) {
+
+      const placeholders = ids.map(() => '?').join(',');
+
+      sql += " WHERE neighborhood_number IN (" + placeholders + ")";
+
+      params = ids;
+
+    }
+
+  }
+
+ 
+
+  sql += " ORDER BY neighborhood_number ASC";
+
+ 
+
+  dbSelect(sql, params)
+
+    .then(rows => {
+
+      // Ensure rows is array; default to empty array
+
+      const result = Array.isArray(rows) ? rows : [];
+
+      res.status(200).json(result);
+
+    })
+
+    .catch(err => {
+
+      console.error("Error querying neighborhoods:", err);
+
+      res.status(500).send("database error");
+
+    });
+
 });
 
 // GET request handler for crime incidents
@@ -166,9 +212,69 @@ app.get('/incidents', async (req,res) => {
 
 // PUT request handler for new crime incident
 app.put('/new-incident', (req, res) => {
-    console.log(req.body); // uploaded data
-    
-    res.status(200).type('txt').send('OK'); // <-- you may need to change this
+
+    console.log(req.body);
+
+ 
+
+    let { case_number, date, time, code, incident, police_grid, neighborhood_number, block } = req.body;
+
+ 
+
+    if (!case_number || !date || !time || !code || !incident || !police_grid || !neighborhood_number || !block) {
+
+        res.status(400).type('txt').send("error: missing field");
+
+        return;
+
+    }
+
+ 
+
+    let date_time = date + " " + time;
+
+ 
+
+    let checkQuery = "SELECT case_number FROM Incidents WHERE case_number = ?";
+
+    dbSelect(checkQuery, [case_number])
+
+        .then(rows => {
+
+            if (rows.length > 0) {
+
+                res.status(500).type('txt').send("error: case number already exists");
+
+                return;
+
+            }
+
+ 
+
+            let insertQuery = `INSERT INTO Incidents (case_number, date_time, code, incident, police_grid, neighborhood_number, block) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+            let params = [case_number, date_time, code, incident, police_grid, neighborhood_number, block];
+
+ 
+
+            return dbRun(insertQuery, params)
+
+                .then(() => {
+
+                    res.status(201).type('txt').send("success");
+
+                });
+
+        })
+
+        .catch(err => {
+
+            console.error(err);
+
+            res.status(500).type('txt').send("database error");
+
+        });
+
 });
 
 // DELETE request handler for new crime incident
